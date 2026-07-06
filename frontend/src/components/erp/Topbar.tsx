@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -11,6 +11,25 @@ export function Topbar() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [validating, setValidating] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Skróty klawiaturowe: Ctrl+K — szukaj, Alt+D — dashboard, Alt+W — walidacje
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      } else if (event.altKey && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        navigate("/");
+      } else if (event.altKey && event.key.toLowerCase() === "w") {
+        event.preventDefault();
+        navigate("/validation");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [navigate]);
 
   const runSync = async () => {
     try {
@@ -49,7 +68,8 @@ export function Topbar() {
       <span className="topbar__spacer" />
       <form className="topbar__search" onSubmit={handleSearch}>
         <input
-          placeholder="Szukaj faktury / klienta…  (Enter)"
+          ref={searchRef}
+          placeholder="Szukaj faktury / klienta…  (Ctrl+K)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
