@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-erp_wms}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-erp} -d ${POSTGRES_DB:-erp_wms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Port lokalny wyłącznie do administracji/backupów; usuń, jeśli niepotrzebny.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-erp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-erp_wms}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
