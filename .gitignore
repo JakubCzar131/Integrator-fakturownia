@@ -1,0 +1,25 @@
+# Environment / secrets — never commit tokens
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Backups
+backups/*.sql
+backups/*.dump
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
