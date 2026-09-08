@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.enums import WarehouseDocumentKind
@@ -107,11 +107,15 @@ def rebuild_document_positions(db: Session) -> dict[str, Any]:
             stats["unchanged"] += 1
             continue
 
+        # An ORM-level delete keeps the identity map and the ``positions``
+        # collection in step with the database; a Core-level delete would leave
+        # the session serving the rows it just removed.
         db.execute(
-            WarehouseDocumentPosition.__table__.delete().where(
+            delete(WarehouseDocumentPosition).where(
                 WarehouseDocumentPosition.document_id == document.id
             )
         )
+        db.expire(document, ["positions"])
         kind = normalize_document_kind(document.kind)
         for payload in payloads:
             position = _build_position(document, kind, payload)

@@ -358,10 +358,19 @@ class ReconciliationService:
             ).all()
         ]
         stale = ids[keep:]
-        if stale:
-            self.db.execute(
-                delete(ReconciliationRun).where(ReconciliationRun.id.in_(stale))
+        if not stale:
+            return
+        # Lines are removed explicitly rather than through the foreign key
+        # cascade, so pruning behaves the same no matter how the database is
+        # configured — an orphaned snapshot would silently distort the trend.
+        self.db.execute(
+            delete(StockReconciliationLine).where(
+                StockReconciliationLine.run_id.in_(stale)
             )
+        )
+        self.db.execute(
+            delete(ReconciliationRun).where(ReconciliationRun.id.in_(stale))
+        )
 
 
 def reconciled_stock_map(db: Session) -> dict[int, Decimal]:

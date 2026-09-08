@@ -123,9 +123,21 @@ FAKE_INVOICES = [
 ]
 
 FAKE_WAREHOUSE_DOCUMENTS = [
+    # Positions reachable only through warehouse_actions (fallback shape).
     {"id": 7001, "kind": "PZ", "number": "PZ 1/2025", "warehouse_id": 900,
      "issue_date": "2025-01-02", "client_id": None, "invoice_id": None,
      "description": "Dostawa początkowa"},
+    # Positions embedded in the document payload (preferred shape).
+    {"id": 7002, "kind": "PW", "number": "PW 1/2025", "warehouse_id": 900,
+     "issue_date": "2025-01-05", "client_id": None, "invoice_id": None,
+     "description": "Przyjęcie wewnętrzne",
+     "positions": [
+         {"id": 8101, "product_id": 102, "name": "Widget B", "code": "WID-B",
+          "quantity": "30", "quantity_unit": "szt", "purchase_price_net": "8.00"},
+         # No product_id — resolved through the mapping pipeline (code match).
+         {"id": 8102, "product_id": None, "name": "Widget A", "code": "WID-A",
+          "quantity": "5", "quantity_unit": "szt", "purchase_price_net": "78.00"},
+     ]},
 ]
 
 FAKE_WAREHOUSE_ACTIONS = [
@@ -149,9 +161,15 @@ class FakeFakturowniaClient:
         self,
         invoices: list[dict[str, Any]] | None = None,
         products: list[dict[str, Any]] | None = None,
+        warehouse_documents: list[dict[str, Any]] | None = None,
     ) -> None:
         self.invoices = invoices if invoices is not None else FAKE_INVOICES
         self.products = products if products is not None else FAKE_PRODUCTS
+        self.warehouse_documents = (
+            warehouse_documents
+            if warehouse_documents is not None
+            else FAKE_WAREHOUSE_DOCUMENTS
+        )
         self.requested_methods: list[str] = []
 
     def get_departments(self) -> list[dict[str, Any]]:
@@ -180,7 +198,7 @@ class FakeFakturowniaClient:
         yield self.invoices
 
     def iter_warehouse_documents(self) -> Iterator[list[dict[str, Any]]]:
-        yield FAKE_WAREHOUSE_DOCUMENTS
+        yield self.warehouse_documents
 
     def iter_warehouse_actions(self) -> Iterator[list[dict[str, Any]]]:
         yield FAKE_WAREHOUSE_ACTIONS

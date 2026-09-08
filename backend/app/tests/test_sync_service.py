@@ -30,7 +30,7 @@ def test_full_sync_imports_all_resources(db) -> None:
     assert db.execute(select(func.count(FakturowniaProduct.id))).scalar_one() == 3
     assert db.execute(select(func.count(FakturowniaClientRow.id))).scalar_one() == 2
     assert db.execute(select(func.count(Warehouse.id))).scalar_one() == 1
-    assert db.execute(select(func.count(WarehouseDocument.id))).scalar_one() == 1
+    assert db.execute(select(func.count(WarehouseDocument.id))).scalar_one() == 2
     assert db.execute(select(func.count(WarehouseAction.id))).scalar_one() == 1
 
 
