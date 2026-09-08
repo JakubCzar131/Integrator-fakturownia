@@ -87,4 +87,31 @@ export const STATUS_LABELS: Record<string, string> = {
   CONFIRMED: "Zatwierdzone",
   PROPOSED: "Propozycja",
   REJECTED: "Odrzucone",
+  DISCREPANCY: "Rozbieżność",
+  NO_REMOTE_STOCK: "Brak stanu w Fakturowni",
+  LINKED: "Powiązany",
+  MISSING: "Brak w sklepie",
+  AMBIGUOUS: "Niejednoznaczny",
+  EXCLUDED: "Wyłączony z synchronizacji",
+  PENDING_CREATE: "Do dodania w sklepie",
+  PENDING: "Oczekuje",
+  CANCELLED: "Anulowane",
+  SKIPPED: "Pominięte",
+  NEVER: "Nietestowane",
+  DATABASE: "Baza danych",
+  ENV: "Zmienne środowiskowe",
+  NONE: "Brak konfiguracji",
+};
+
+export const JOB_TYPE_LABELS: Record<string, string> = {
+  SKYSHOP_STOCK_PUSH: "Aktualizacja stanu",
+  SKYSHOP_PRODUCT_CREATE: "Dodanie produktu",
+  SKYSHOP_PRODUCT_UPDATE: "Aktualizacja produktu",
+  SKYSHOP_MIRROR_REFRESH: "Odświeżenie mirroru",
+};
+
+export const STOCK_SOURCE_LABELS: Record<string, string> = {
+  LOCAL_LEDGER: "Magazyn lokalny (ruchy)",
+  FAKTUROWNIA: "Stany z Fakturowni",
+  RECONCILED: "Stany po rozliczeniu",
 };

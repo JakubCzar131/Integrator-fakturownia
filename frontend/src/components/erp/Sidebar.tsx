@@ -33,6 +33,12 @@ const ITEM_GROUPS: { group: string; items: { to: string; icon: string; label: st
     ],
   },
   {
+    group: "Sklep SkyShop",
+    items: [
+      { to: "/skyshop", icon: "▨", label: "Synchronizacja sklepu" },
+    ],
+  },
+  {
     group: "Kontrola",
     items: [
       { to: "/reconciliation", icon: "⚖", label: "Rozliczenie dokumentów" },

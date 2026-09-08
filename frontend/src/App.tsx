@@ -16,6 +16,7 @@ import { ProductsPage } from "./modules/products/ProductsPage";
 import { ReconciliationPage } from "./modules/reconciliation/ReconciliationPage";
 import { ReportsPage } from "./modules/reports/ReportsPage";
 import { SettingsPage } from "./modules/settings/SettingsPage";
+import { SkyShopPage } from "./modules/skyshop/SkyShopPage";
 import { StockBalancesPage } from "./modules/stock/StockBalancesPage";
 import { StockLedgerPage } from "./modules/stock/StockLedgerPage";
 import { WarehouseDocumentsPage } from "./modules/stock/WarehouseDocumentsPage";
@@ -62,6 +63,7 @@ export default function App() {
               <Route path="/stock-ledger" element={<StockLedgerPage />} />
               <Route path="/warehouse-documents" element={<WarehouseDocumentsPage />} />
               <Route path="/reconciliation" element={<ReconciliationPage />} />
+              <Route path="/skyshop" element={<SkyShopPage />} />
               <Route path="/validation" element={<ValidationPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/sync" element={<SyncPage />} />

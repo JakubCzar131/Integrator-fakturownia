@@ -330,9 +330,17 @@ def save_product_content(
         db.add(content)
     old_hash = content_hash(product, content)
 
+    # ``exclude_unset`` already separates "not sent" from "sent as null", so an
+    # explicit null clears the field instead of being ignored.  The two JSON
+    # collections are kept non-null so consumers never have to handle both
+    # an empty list and NULL.
+    empty_by_field = {"images": [], "attributes": {}}
     for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(content, field, value)
+        if value is None and field in empty_by_field:
+            value = empty_by_field[field]
+        setattr(content, field, value)
+    if content.is_publishable is None:
+        content.is_publishable = True
     content.updated_by_user_id = user.id
     db.flush()
 

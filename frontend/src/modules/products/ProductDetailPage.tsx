@@ -12,6 +12,7 @@ import { StockLedgerTable } from "../../components/erp/StockLedgerTable";
 import { useToast } from "../../components/erp/Toast";
 import { ValidationPanel } from "../../components/erp/ValidationPanel";
 import { formatDate, formatMoney } from "../../lib/format";
+import { ProductContentPanel } from "./ProductContentPanel";
 
 function SalesHistory({ productId }: { productId: number }) {
   const [positions, setPositions] = useState<InvoicePosition[]>([]);
@@ -190,6 +191,20 @@ export function ProductDetailPage() {
           },
           { key: "sales", label: "Historia sprzedaży", content: <SalesHistory productId={productId} /> },
           { key: "ledger", label: "Ruchy magazynowe", content: <StockLedgerTable productId={productId} /> },
+          {
+            key: "receipts", label: "Przyjęcia PZ/PW",
+            content: (
+              <p>
+                <Link to={`/warehouse-documents?product_id=${productId}`}>
+                  Pozycje dokumentów przyjęć dla tego produktu →
+                </Link>
+              </p>
+            ),
+          },
+          {
+            key: "shop", label: "Treść dla sklepu (PIM)",
+            content: <ProductContentPanel productId={productId} />,
+          },
           { key: "stock", label: "Stany lokalne", content: <StockBalanceTable /> },
           {
             key: "validation", label: `Walidacja (${issues.length})`,
