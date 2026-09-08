@@ -96,7 +96,9 @@ def run_job(db: Session, job: SyncJob, service: SkyShopService) -> None:
         db.commit()
 
 
-def process_pending_jobs(db: Session, limit: int | None = None) -> dict[str, int]:
+def process_pending_jobs(
+    db: Session, limit: int | None = None, service: SkyShopService | None = None
+) -> dict[str, int]:
     """Claim and execute a batch of jobs. Returns per-status counters."""
     limit = limit or get_settings().job_worker_batch_size
     jobs = claim_jobs(db, limit)
@@ -104,7 +106,8 @@ def process_pending_jobs(db: Session, limit: int | None = None) -> dict[str, int
     if not jobs:
         return stats
 
-    service = SkyShopService(db)
+    owns_service = service is None
+    service = service or SkyShopService(db)
     try:
         for job in jobs:
             run_job(db, job, service)
@@ -118,7 +121,8 @@ def process_pending_jobs(db: Session, limit: int | None = None) -> dict[str, int
             else:
                 stats["retry"] += 1
     finally:
-        service.close()
+        if owns_service:
+            service.close()
     return stats
 
 
