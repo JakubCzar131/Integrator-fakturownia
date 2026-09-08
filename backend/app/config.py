@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     secret_key: SecretStr = SecretStr("change-me-in-production")
     access_token_expire_minutes: int = 8 * 60
     jwt_algorithm: str = "HS256"
+    # Fernet key encrypting integration secrets kept in the database.
+    # Empty = derived from secret_key (see app.security.crypto).
+    integration_master_key: SecretStr = SecretStr("")
 
     # --- bootstrap admin (created on first start if no users exist) ---
     admin_email: str = "admin@local"
@@ -41,6 +44,9 @@ class Settings(BaseSettings):
     admin_full_name: str = "Administrator"
 
     # --- Fakturownia (READ-ONLY source system) ---
+    # Fallback only: integration credentials are normally managed in the
+    # application (Ustawienia -> Integracje) and stored encrypted in the
+    # database.  These variables keep older installations working.
     fakturownia_domain: str = ""  # e.g. "mycompany" -> https://mycompany.fakturownia.pl
     fakturownia_api_token: SecretStr = SecretStr("")
     fakturownia_per_page: int = 100
@@ -48,9 +54,20 @@ class Settings(BaseSettings):
     fakturownia_max_retries: int = 5
     fakturownia_timeout_seconds: float = 30.0
 
+    # --- SkyShop webshop (read + write, fallback configuration) ---
+    skyshop_base_url: str = ""  # e.g. "https://sklep.example.pl/api"
+    skyshop_api_key: SecretStr = SecretStr("")
+    skyshop_rate_limit_rps: float = 1.0  # platform hard limit: 1 request/second
+    skyshop_max_retries: int = 4
+    skyshop_timeout_seconds: float = 30.0
+
     # --- sync scheduler ---
     sync_schedule_enabled: bool = False
     sync_interval_minutes: int = 60
+    # Outbox worker polling the sync_jobs queue (SkyShop writes).
+    job_worker_enabled: bool = True
+    job_worker_interval_seconds: int = 5
+    job_worker_batch_size: int = 10
 
     @property
     def fakturownia_base_url(self) -> str:
@@ -64,7 +81,9 @@ class Settings(BaseSettings):
         """All secret values that must be masked in logs."""
         values = [
             self.fakturownia_api_token.get_secret_value(),
+            self.skyshop_api_key.get_secret_value(),
             self.secret_key.get_secret_value(),
+            self.integration_master_key.get_secret_value(),
             self.admin_password.get_secret_value(),
         ]
         return [v for v in values if v and len(v) >= 4]

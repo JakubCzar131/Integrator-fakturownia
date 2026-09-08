@@ -23,7 +23,12 @@ from typing import Any, Callable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import ResourceType, SyncRunStatus, SyncRunType
+from app.models.enums import (
+    IntegrationProvider,
+    ResourceType,
+    SyncRunStatus,
+    SyncRunType,
+)
 from app.models.fakturownia import (
     FakturowniaCategory,
     FakturowniaClient as FakturowniaClientRow,
@@ -43,12 +48,22 @@ from app.models.sync import SourceSnapshot, SyncRun
 from app.models.user import User
 from app.services import parsing as p
 from app.services.fakturownia_client import FakturowniaClient, FakturowniaError
-from app.services.mapping_service import apply_position_mappings, ensure_local_products
+from app.services.mapping_service import (
+    apply_document_position_mappings,
+    apply_position_mappings,
+    ensure_local_products,
+)
+from app.services.reconciliation_service import ReconciliationService
+from app.services.stock_service import StockService, get_setting
+from app.services.warehouse_document_service import rebuild_document_positions
 
 logger = logging.getLogger(__name__)
 
 LAST_SYNC_SETTING_KEY = "last_successful_sync_at"
 INCREMENTAL_OVERLAP_DAYS = 7
+
+SETTING_REBUILD_STOCK_AFTER_SYNC = "sync_rebuild_stock_after_sync"
+SETTING_RECONCILE_AFTER_SYNC = "sync_reconcile_after_sync"
 
 
 @dataclass
@@ -85,6 +100,7 @@ class SyncService:
 
     def _run(self, run_type: SyncRunType, user: User | None) -> SyncRun:
         run = SyncRun(
+            provider=str(IntegrationProvider.FAKTUROWNIA),
             run_type=str(run_type),
             status=str(SyncRunStatus.RUNNING),
             triggered_by_user_id=user.id if user else None,
@@ -132,16 +148,35 @@ class SyncService:
                 logger.exception("Sync step crashed: %s", name)
                 all_errors.append(message)
 
-        # Post-processing: local product master + automatic position mapping.
+        # Post-processing (local only): product master, position mapping,
+        # normalized PZ/PW positions.
         try:
             ensure_local_products(self.db)
-            mapping_stats = apply_position_mappings(self.db)
-            stats["position_mapping"] = mapping_stats
+            stats["position_mapping"] = apply_position_mappings(self.db)
+            stats["warehouse_document_positions"] = rebuild_document_positions(self.db)
+            stats["document_position_mapping"] = apply_document_position_mappings(self.db)
             self.db.commit()
         except Exception as exc:
             self.db.rollback()
             all_errors.append(f"post_processing: {exc}")
             logger.exception("Sync post-processing failed")
+
+        # Derived layers: ledger rebuild, reconciliation snapshot and the
+        # SkyShop stock delta (queued, never sent inline).
+        for name, step_fn in (
+            ("stock_rebuild", self._rebuild_stock_step),
+            ("reconciliation", lambda: self._reconciliation_step(run)),
+            ("skyshop_stock_delta", self._skyshop_delta_step),
+        ):
+            try:
+                result = step_fn()
+                if result is not None:
+                    stats[name] = result
+                self.db.commit()
+            except Exception as exc:
+                self.db.rollback()
+                all_errors.append(f"{name}: {exc}")
+                logger.exception("Sync follow-up step failed: %s", name)
 
         finished = datetime.now(timezone.utc)
         run.finished_at = finished
@@ -163,6 +198,38 @@ class SyncService:
         )
         self.db.commit()
         return run
+
+    # ------------------------------------------------------------------ #
+    # Follow-up steps (all local; the SkyShop push is only enqueued)
+    # ------------------------------------------------------------------ #
+    def _rebuild_stock_step(self) -> dict[str, Any] | None:
+        if not get_setting(self.db, SETTING_REBUILD_STOCK_AFTER_SYNC, True):
+            return None
+        return StockService(self.db).rebuild_stock()
+
+    def _reconciliation_step(self, run: SyncRun) -> dict[str, Any] | None:
+        if not get_setting(self.db, SETTING_RECONCILE_AFTER_SYNC, True):
+            return None
+        reconciliation = ReconciliationService(self.db).refresh(
+            trigger="SYNC", sync_run_id=run.id
+        )
+        return {
+            "run_id": reconciliation.id,
+            "lines": reconciliation.line_count,
+            "discrepancies": reconciliation.discrepancy_count,
+        }
+
+    def _skyshop_delta_step(self) -> dict[str, Any] | None:
+        """Queue stock pushes for products whose quantity changed.
+
+        Only enqueues — the outbox worker performs the actual (rate-limited)
+        requests, and the global kill switch still applies at execution time.
+        """
+        from app.services.skyshop_service import SETTING_AUTO_STOCK_PUSH, SkyShopService
+
+        if not get_setting(self.db, SETTING_AUTO_STOCK_PUSH, False):
+            return None
+        return SkyShopService(self.db).enqueue_stock_sync()
 
     # ------------------------------------------------------------------ #
     # Generic upsert helpers

@@ -1,4 +1,10 @@
-"""Optional periodic incremental sync using APScheduler (in-process)."""
+"""In-process background jobs (APScheduler).
+
+Two independent schedules:
+
+* optional periodic incremental sync from Fakturownia,
+* the outbox worker draining ``sync_jobs`` (SkyShop writes) at a steady pace.
+"""
 from __future__ import annotations
 
 import logging
@@ -27,23 +33,41 @@ def _scheduled_incremental_sync() -> None:
 def start_scheduler() -> None:
     global _scheduler
     settings = get_settings()
-    if not settings.sync_schedule_enabled:
-        logger.info("Sync scheduler disabled (SYNC_SCHEDULE_ENABLED=false)")
+    if not (settings.sync_schedule_enabled or settings.job_worker_enabled):
+        logger.info("Scheduler disabled (SYNC_SCHEDULE_ENABLED / JOB_WORKER_ENABLED = false)")
         return
+
     _scheduler = BackgroundScheduler(timezone="UTC")
-    _scheduler.add_job(
-        _scheduled_incremental_sync,
-        "interval",
-        minutes=settings.sync_interval_minutes,
-        id="incremental_sync",
-        max_instances=1,
-        coalesce=True,
-    )
+    if settings.sync_schedule_enabled:
+        _scheduler.add_job(
+            _scheduled_incremental_sync,
+            "interval",
+            minutes=settings.sync_interval_minutes,
+            id="incremental_sync",
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(
+            "Sync scheduler started: incremental sync every %d minutes",
+            settings.sync_interval_minutes,
+        )
+    if settings.job_worker_enabled:
+        from app.services.sync_worker import worker_tick
+
+        _scheduler.add_job(
+            worker_tick,
+            "interval",
+            seconds=settings.job_worker_interval_seconds,
+            id="sync_job_worker",
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(
+            "Outbox worker started: every %d s, batch %d",
+            settings.job_worker_interval_seconds,
+            settings.job_worker_batch_size,
+        )
     _scheduler.start()
-    logger.info(
-        "Sync scheduler started: incremental sync every %d minutes",
-        settings.sync_interval_minutes,
-    )
 
 
 def stop_scheduler() -> None:

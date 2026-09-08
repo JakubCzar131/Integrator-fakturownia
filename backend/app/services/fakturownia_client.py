@@ -31,8 +31,11 @@ from typing import Any
 
 import httpx
 
-from app.config import Settings, get_settings
 from app.logging_config import mask_secrets
+from app.services.integration_config import (
+    FakturowniaConfig,
+    fakturownia_config_from_env,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,19 +97,25 @@ class FakturowniaClient:
 
     def __init__(
         self,
-        settings: Settings | None = None,
+        config: FakturowniaConfig | None = None,
         audit_callback: AuditCallback | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        self._settings = settings or get_settings()
+        # Configuration normally comes from the database (Ustawienia →
+        # Integracje); the env-based config is the fallback.
+        self._config = config or fakturownia_config_from_env()
         self._audit_callback = audit_callback
-        self._rate_limiter = _RateLimiter(self._settings.fakturownia_rate_limit_rps)
+        self._rate_limiter = _RateLimiter(self._config.rate_limit_rps)
         self._client = httpx.Client(
-            base_url=self._settings.fakturownia_base_url,
-            timeout=self._settings.fakturownia_timeout_seconds,
+            base_url=self._config.base_url,
+            timeout=self._config.timeout_seconds,
             transport=transport,
             event_hooks={"request": [self._transport_guard]},
         )
+
+    @property
+    def config(self) -> FakturowniaConfig:
+        return self._config
 
     # ------------------------------------------------------------------ #
     # Read-only guard
@@ -136,7 +145,7 @@ class FakturowniaClient:
         """Execute a request. Only GET is permitted — everything else raises."""
         method_upper = (method or "").upper()
         if method_upper not in ALLOWED_METHODS:
-            self._record_violation(method_upper, f"{self._settings.fakturownia_base_url}{path}")
+            self._record_violation(method_upper, f"{self._config.base_url}{path}")
             raise FakturowniaReadOnlyViolation(method_upper, path)
         return self._get_with_retry(path, params or {})
 
@@ -166,10 +175,10 @@ class FakturowniaClient:
 
     def _get_with_retry(self, path: str, params: dict[str, Any]) -> Any:
         query = dict(params)
-        query["api_token"] = self._settings.fakturownia_api_token.get_secret_value()
+        query["api_token"] = self._config.api_token
 
         last_error: Exception | None = None
-        for attempt in range(1, self._settings.fakturownia_max_retries + 1):
+        for attempt in range(1, self._config.max_retries + 1):
             self._rate_limiter.wait()
             try:
                 response = self._client.get(path, params=query)
@@ -181,7 +190,7 @@ class FakturowniaClient:
                 )
                 logger.warning(
                     "Fakturownia GET %s failed (attempt %d/%d): %s",
-                    path, attempt, self._settings.fakturownia_max_retries,
+                    path, attempt, self._config.max_retries,
                     mask_secrets(str(exc)),
                 )
                 self._sleep_backoff(attempt)
@@ -202,7 +211,7 @@ class FakturowniaClient:
                 logger.warning(
                     "Fakturownia GET %s returned %d (attempt %d/%d)",
                     path, response.status_code, attempt,
-                    self._settings.fakturownia_max_retries,
+                    self._config.max_retries,
                 )
                 self._sleep_backoff(attempt, response)
                 continue
@@ -226,7 +235,7 @@ class FakturowniaClient:
         self, path: str, params: dict[str, Any] | None = None, per_page: int | None = None
     ) -> Iterator[list[dict[str, Any]]]:
         """Iterate over all pages of a paginated list endpoint."""
-        per_page = per_page or self._settings.fakturownia_per_page
+        per_page = per_page or self._config.per_page
         page = 1
         while True:
             page_params = dict(params or {})

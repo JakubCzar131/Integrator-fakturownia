@@ -41,6 +41,64 @@ def record_audit(
     return entry
 
 
+def skyshop_write_audit_callback(session_factory, user_id: int | None = None) -> Any:
+    """Build the audit callback wired into the SkyShop client.
+
+    Every attempted mutation (executed, dry-run or blocked by the kill switch)
+    is persisted in its own short-lived session, so the trail survives even if
+    the surrounding job transaction is rolled back.
+    """
+
+    def _callback(
+        action: str,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None,
+        response: Any,
+        blocked_reason: str | None = None,
+    ) -> None:
+        session: Session = session_factory()
+        try:
+            user = session.get(User, user_id) if user_id else None
+            description = (
+                f"SkyShop {method} {path}"
+                if not blocked_reason
+                else f"SkyShop {method} {path} — zablokowano ({blocked_reason})"
+            )
+            record_audit(
+                session,
+                AuditAction.SKYSHOP_WRITE_BLOCKED if blocked_reason else AuditAction.SKYSHOP_WRITE,
+                user=user,
+                object_type="skyshop_api",
+                object_id=path,
+                description=description,
+                new_value={
+                    "method": method,
+                    "payload": _jsonable(payload),
+                    "response": _jsonable(response),
+                    "blocked_reason": blocked_reason,
+                },
+            )
+            session.commit()
+        except Exception:  # pragma: no cover - auditing must not break the write
+            session.rollback()
+            logger.exception("Could not persist SkyShop write audit entry")
+        finally:
+            session.close()
+
+    return _callback
+
+
+def _jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    return str(value)
+
+
 def readonly_violation_audit_callback(session_factory) -> Any:
     """Build the audit callback wired into the Fakturownia read-only client.
 

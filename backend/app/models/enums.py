@@ -19,6 +19,27 @@ class RoleName(StrEnum):
     AUDITOR = "auditor"
 
 
+class IntegrationProvider(StrEnum):
+    """External systems the integrator talks to."""
+
+    FAKTUROWNIA = "FAKTUROWNIA"  # read-only source of truth for sales
+    SKYSHOP = "SKYSHOP"          # webshop, the only write direction
+
+
+class ConfigSource(StrEnum):
+    """Where an effective integration configuration came from."""
+
+    DATABASE = "DATABASE"
+    ENV = "ENV"
+    NONE = "NONE"
+
+
+class VerificationStatus(StrEnum):
+    NEVER = "NEVER"
+    OK = "OK"
+    FAILED = "FAILED"
+
+
 class SyncRunType(StrEnum):
     FULL = "FULL"
     INCREMENTAL = "INCREMENTAL"
@@ -139,8 +160,66 @@ class AuditAction(StrEnum):
     VALIDATION_STARTED = "VALIDATION_STARTED"
     VALIDATION_FINISHED = "VALIDATION_FINISHED"
     STOCK_RECALCULATED = "STOCK_RECALCULATED"
+    RECONCILIATION_REFRESHED = "RECONCILIATION_REFRESHED"
     EXPORT = "EXPORT"
     READONLY_VIOLATION_BLOCKED = "READONLY_VIOLATION_BLOCKED"
+    INTEGRATION_TESTED = "INTEGRATION_TESTED"
+    SKYSHOP_WRITE = "SKYSHOP_WRITE"
+    SKYSHOP_WRITE_BLOCKED = "SKYSHOP_WRITE_BLOCKED"
+    JOB_ENQUEUED = "JOB_ENQUEUED"
+
+
+class WarehouseDocumentKind(StrEnum):
+    """Warehouse document kinds mirrored from Fakturownia."""
+
+    PZ = "PZ"          # przyjęcie zewnętrzne (goods receipt from a supplier)
+    PW = "PW"          # przyjęcie wewnętrzne (internal receipt)
+    WZ = "WZ"          # wydanie zewnętrzne
+    RW = "RW"          # rozchód wewnętrzny
+    MM = "MM"          # przesunięcie międzymagazynowe
+    ZW = "ZW"          # zwrot
+    OTHER = "OTHER"
+
+
+INBOUND_DOCUMENT_KINDS = (WarehouseDocumentKind.PZ, WarehouseDocumentKind.PW)
+
+
+class ReconciliationStatus(StrEnum):
+    OK = "OK"
+    DISCREPANCY = "DISCREPANCY"
+    NO_REMOTE_STOCK = "NO_REMOTE_STOCK"
+
+
+class SkyShopLinkStatus(StrEnum):
+    LINKED = "LINKED"
+    MISSING = "MISSING"
+    AMBIGUOUS = "AMBIGUOUS"
+    EXCLUDED = "EXCLUDED"
+    PENDING_CREATE = "PENDING_CREATE"
+
+
+class SyncJobStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    SKIPPED = "SKIPPED"
+
+
+class SyncJobType(StrEnum):
+    SKYSHOP_STOCK_PUSH = "SKYSHOP_STOCK_PUSH"
+    SKYSHOP_PRODUCT_CREATE = "SKYSHOP_PRODUCT_CREATE"
+    SKYSHOP_PRODUCT_UPDATE = "SKYSHOP_PRODUCT_UPDATE"
+    SKYSHOP_MIRROR_REFRESH = "SKYSHOP_MIRROR_REFRESH"
+
+
+class StockSource(StrEnum):
+    """Which stock figure is published to the webshop."""
+
+    LOCAL_LEDGER = "LOCAL_LEDGER"
+    FAKTUROWNIA = "FAKTUROWNIA"
+    RECONCILED = "RECONCILED"
 
 
 class ExportFormat(StrEnum):

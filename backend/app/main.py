@@ -14,16 +14,20 @@ from app.api.routes import (
     clients,
     dashboard,
     health,
+    integrations,
     invoice_positions,
     invoices,
     product_mappings,
     products,
+    reconciliation,
     reports,
     settings as settings_routes,
+    skyshop,
     stock,
     sync,
     users,
     validation,
+    warehouse_documents,
 )
 from app.config import get_settings
 from app.logging_config import configure_logging
@@ -64,9 +68,13 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=__version__,
         description=(
-            "Lokalny panel kontrolny ERP/WMS dla sprzedaży prowadzonej w Fakturowni. "
+            "Integrator Fakturownia ↔ SkyShop: lokalny panel kontrolny ERP/WMS dla "
+            "sprzedaży prowadzonej w Fakturowni plus synchronizacja stanów "
+            "magazynowych i produktów ze sklepem SkyShop.\n\n"
             "Integracja z Fakturownią jest **wyłącznie do odczytu (GET)** — klient API "
-            "technicznie blokuje wszystkie metody zapisu."
+            "technicznie blokuje wszystkie metody zapisu. Jedynym kierunkiem zapisu "
+            "jest SkyShop: osobny klient, globalny kill-switch, tryb dry-run oraz "
+            "audyt każdej mutacji."
         ),
         lifespan=lifespan,
         docs_url="/api/docs",
@@ -92,10 +100,14 @@ def create_app() -> FastAPI:
     app.include_router(product_mappings.router, prefix=prefix)
     app.include_router(clients.router, prefix=prefix)
     app.include_router(stock.router, prefix=prefix)
+    app.include_router(warehouse_documents.router, prefix=prefix)
+    app.include_router(reconciliation.router, prefix=prefix)
+    app.include_router(skyshop.router, prefix=prefix)
     app.include_router(validation.router, prefix=prefix)
     app.include_router(reports.router, prefix=prefix)
     app.include_router(audit.router, prefix=prefix)
     app.include_router(settings_routes.router, prefix=prefix)
+    app.include_router(integrations.router, prefix=prefix)
     return app
 
 

@@ -9,6 +9,7 @@ from app.database.session import get_db
 from app.models.enums import AuditAction, ProductKind
 from app.models.fakturownia import FakturowniaProduct
 from app.models.product import Product, ProductAlias, ProductBundleComponent
+from app.models.skyshop import ProductContent
 from app.models.stock import LocalStockBalance
 from app.models.user import User
 from app.models.validation import ValidationIssue
@@ -22,9 +23,11 @@ from app.schemas.domain import (
     ProductOut,
     ProductUpdate,
 )
+from app.schemas.integrations import ProductContentIn, ProductContentOut
 from app.security.auth import client_ip, require_any_role, require_operator
 from app.services.parsing import normalize_text
 from app.services.report_service import OPEN_ISSUE_STATUSES
+from app.services.skyshop_service import SkyShopService, content_hash
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -285,3 +288,66 @@ def set_bundle_components(
     )
     db.commit()
     return MessageResponse(message="Skład zestawu zapisany lokalnie")
+
+
+# ------------------------- PIM content (SkyShop) ------------------------ #
+@router.get("/{product_id}/content", response_model=ProductContentOut)
+def get_product_content(
+    product_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_any_role),
+) -> ProductContentOut:
+    """Locally curated shop content (description, images, attributes, price)."""
+    product = db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Produkt nie istnieje")
+    content = db.get(ProductContent, product_id)
+    out = (
+        ProductContentOut.model_validate(content)
+        if content is not None
+        else ProductContentOut(product_id=product_id)
+    )
+    out.content_hash = content_hash(product, content)
+    out.publication_problems = SkyShopService(db).validate_for_publication(product)
+    return out
+
+
+@router.put("/{product_id}/content", response_model=ProductContentOut)
+def save_product_content(
+    product_id: int,
+    payload: ProductContentIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_operator),
+) -> ProductContentOut:
+    """Save shop content locally. Publication itself goes through the queue."""
+    product = db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Produkt nie istnieje")
+    content = db.get(ProductContent, product_id)
+    if content is None:
+        content = ProductContent(product_id=product_id, images=[], attributes={})
+        db.add(content)
+    old_hash = content_hash(product, content)
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(content, field, value)
+    content.updated_by_user_id = user.id
+    db.flush()
+
+    new_hash = content_hash(product, content)
+    record_audit(
+        db, AuditAction.UPDATE, user=user, object_type="product_content",
+        object_id=product_id,
+        description=f"Zapisano dane PIM produktu „{product.name}”",
+        old_value={"content_hash": old_hash},
+        new_value={"content_hash": new_hash},
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(content)
+    out = ProductContentOut.model_validate(content)
+    out.content_hash = new_hash
+    out.publication_problems = SkyShopService(db).validate_for_publication(product)
+    return out

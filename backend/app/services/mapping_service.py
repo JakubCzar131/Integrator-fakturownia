@@ -25,7 +25,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.enums import MappingMatchType, MappingStatus, ProductKind
-from app.models.fakturownia import FakturowniaInvoicePosition, FakturowniaProduct
+from app.models.fakturownia import (
+    FakturowniaInvoicePosition,
+    FakturowniaProduct,
+    WarehouseDocumentPosition,
+)
 from app.models.product import Product, ProductAlias, ProductMapping
 from app.services.parsing import mapping_signature, normalize_text
 
@@ -104,9 +108,13 @@ class _MappingIndex:
 
 
 def _resolve_position(
-    index: _MappingIndex, position: FakturowniaInvoicePosition
+    index: _MappingIndex, position: FakturowniaInvoicePosition | WarehouseDocumentPosition
 ) -> tuple[Product | None, MappingMatchType | None, MappingStatus | None, bool]:
-    """Returns (product, match_type, mapping_status, ambiguous)."""
+    """Returns (product, match_type, mapping_status, ambiguous).
+
+    Works for both invoice positions and warehouse document positions: they
+    expose the same identifying attributes (product id, name, code, unit, raw).
+    """
     if position.product_fakturownia_id is not None:
         product = index.by_fakturownia_id.get(position.product_fakturownia_id)
         if product is not None:
@@ -212,10 +220,48 @@ def apply_position_mappings(db: Session, only_unmapped: bool = False) -> dict[st
     return stats
 
 
+def apply_document_position_mappings(
+    db: Session, only_unmapped: bool = False
+) -> dict[str, Any]:
+    """Resolve product mapping for warehouse document positions (PZ/PW/…).
+
+    Goods receipts go through exactly the same recognition pipeline as invoice
+    positions, so a mapping confirmed once in the mapping panel serves both.
+    """
+    index = _MappingIndex(db)
+    query = select(WarehouseDocumentPosition)
+    if only_unmapped:
+        query = query.where(WarehouseDocumentPosition.mapped_product_id.is_(None))
+
+    stats = {"resolved": 0, "proposed": 0, "unresolved": 0, "ambiguous": 0}
+    for position in db.execute(query).scalars():
+        product, match_type, status, ambiguous = _resolve_position(index, position)
+        if ambiguous:
+            position.mapped_product_id = None
+            position.mapping_status = str(MappingStatus.REJECTED)
+            position.mapping_match_type = str(match_type) if match_type else None
+            stats["ambiguous"] += 1
+            continue
+        if product is None:
+            position.mapped_product_id = None
+            position.mapping_status = None
+            position.mapping_match_type = None
+            stats["unresolved"] += 1
+            _ensure_mapping_stub(db, index, position, None, None)
+            continue
+        position.mapped_product_id = product.id
+        position.mapping_status = str(status)
+        position.mapping_match_type = str(match_type)
+        stats["resolved" if status == MappingStatus.CONFIRMED else "proposed"] += 1
+
+    db.flush()
+    return stats
+
+
 def _ensure_mapping_stub(
     db: Session,
     index: _MappingIndex,
-    position: FakturowniaInvoicePosition,
+    position: FakturowniaInvoicePosition | WarehouseDocumentPosition,
     product_id: int | None,
     match_type: MappingMatchType | None,
     signature: str | None = None,
@@ -240,7 +286,9 @@ def _ensure_mapping_stub(
             product_id=product_id,
             match_type=str(match_type or MappingMatchType.MANUAL),
             status=str(MappingStatus.PROPOSED),
-            example_invoice_position_id=position.id,
+            example_invoice_position_id=(
+                position.id if isinstance(position, FakturowniaInvoicePosition) else None
+            ),
         )
     )
 
@@ -253,6 +301,7 @@ def confirm_mapping(db: Session, mapping: ProductMapping, product_id: int, user_
     mapping.confirmed_at = datetime.now(timezone.utc)
     db.flush()
     apply_position_mappings(db)
+    apply_document_position_mappings(db)
 
 
 def unmapped_positions_count(db: Session) -> int:

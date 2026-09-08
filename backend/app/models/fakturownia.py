@@ -175,6 +175,53 @@ class WarehouseDocument(Base, SyncedMixin):
     invoice_fakturownia_id: Mapped[int | None] = mapped_column(sa.BigInteger, index=True)
     description: Mapped[str | None] = mapped_column(sa.Text)
     raw: Mapped[dict[str, Any] | None] = mapped_column(JSONVariant())
+    # Hash of the extracted position list; positions are rebuilt only when it
+    # changes, so re-running a sync does not churn through every document.
+    positions_built_hash: Mapped[str | None] = mapped_column(sa.String(64))
+
+    positions: Mapped[list["WarehouseDocumentPosition"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class WarehouseDocumentPosition(Base):
+    """Normalized position of a warehouse document (PZ / PW / WZ / RW / MM).
+
+    Fakturownia returns positions inside the document payload (and, for some
+    accounts, only as ``warehouse_actions``); both sources are folded into this
+    table so goods receipts can be aggregated with plain SQL.  ``document_kind``
+    and ``issue_date`` are denormalized from the header for that reason.
+    """
+
+    __tablename__ = "warehouse_document_positions"
+    __table_args__ = (
+        sa.Index("ix_wdp_product_kind", "mapped_product_id", "document_kind"),
+        sa.Index("ix_wdp_issue_date", "issue_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("warehouse_documents.id", ondelete="CASCADE"), index=True
+    )
+    document_kind: Mapped[str | None] = mapped_column(sa.String(20), index=True)
+    fakturownia_id: Mapped[int | None] = mapped_column(sa.BigInteger, unique=True, index=True)
+    source_action_fakturownia_id: Mapped[int | None] = mapped_column(sa.BigInteger, index=True)
+    product_fakturownia_id: Mapped[int | None] = mapped_column(sa.BigInteger, index=True)
+    mapped_product_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("products.id", ondelete="SET NULL"), index=True
+    )
+    mapping_status: Mapped[str | None] = mapped_column(sa.String(20), index=True)
+    mapping_match_type: Mapped[str | None] = mapped_column(sa.String(20))
+    name: Mapped[str | None] = mapped_column(sa.String(1000))
+    code: Mapped[str | None] = mapped_column(sa.String(255))
+    quantity: Mapped[Decimal | None] = mapped_column(Qty)
+    quantity_unit: Mapped[str | None] = mapped_column(sa.String(50))
+    purchase_price_net: Mapped[Decimal | None] = mapped_column(Money)
+    issue_date: Mapped[date | None] = mapped_column(sa.Date)
+    warehouse_fakturownia_id: Mapped[int | None] = mapped_column(sa.BigInteger, index=True)
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSONVariant())
+
+    document: Mapped["WarehouseDocument"] = relationship(back_populates="positions")
 
 
 class WarehouseAction(Base, SyncedMixin):
