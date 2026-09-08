@@ -28,6 +28,19 @@ from app.main import create_app
 import app.models  # noqa: F401
 
 
+@pytest.fixture(autouse=True)
+def isolated_integration_config():
+    """Each test gets its own database, so the cross-request config cache must reset."""
+    from app.logging_config import clear_registered_secrets
+    from app.services.integration_config import IntegrationConfigService
+
+    IntegrationConfigService.clear_cache()
+    clear_registered_secrets()
+    yield
+    IntegrationConfigService.clear_cache()
+    clear_registered_secrets()
+
+
 @pytest.fixture()
 def engine():
     engine = create_engine(
