@@ -204,6 +204,40 @@ def test_pim_content_is_editable_and_reports_publication_problems(
     assert ready["publication_problems"] == []
 
 
+def test_pim_fields_can_be_cleared_and_omitted_fields_are_kept(
+    client, admin_headers, seeded_db
+) -> None:
+    _seed(seeded_db)
+    widget_a = _product_id(seeded_db, "Widget A")
+    client.put(
+        f"/api/v1/products/{widget_a}/content",
+        json={
+            "short_description": "Solidny widget",
+            "description_html": "<p>Opis</p>",
+            "price_gross": "123.00",
+            "local_category": "Elektronika",
+            "attributes": {"Kolor": "czerwony"},
+            "images": [{"url": "https://example.pl/a.jpg"}],
+        },
+        headers=admin_headers,
+    )
+
+    cleared = client.put(
+        f"/api/v1/products/{widget_a}/content",
+        json={"description_html": None, "images": None, "attributes": None},
+        headers=admin_headers,
+    )
+    assert cleared.status_code == 200, cleared.text
+    body = cleared.json()
+    assert body["description_html"] is None
+    assert body["images"] == []
+    assert body["attributes"] == {}
+    # Fields absent from the request keep their stored value.
+    assert body["short_description"] == "Solidny widget"
+    assert body["local_category"] == "Elektronika"
+    assert body["is_publishable"] is True
+
+
 def test_push_is_refused_for_products_that_are_not_ready(
     client, admin_headers, seeded_db
 ) -> None:
