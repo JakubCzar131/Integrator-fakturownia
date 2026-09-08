@@ -29,11 +29,13 @@ const ITEM_GROUPS: { group: string; items: { to: string; icon: string; label: st
       { to: "/warehouses", icon: "⌂", label: "Magazyny" },
       { to: "/stock-balances", icon: "▥", label: "Stany magazynowe" },
       { to: "/stock-ledger", icon: "↕", label: "Ruchy magazynowe" },
+      { to: "/warehouse-documents", icon: "⇥", label: "Dokumenty PZ/PW" },
     ],
   },
   {
     group: "Kontrola",
     items: [
+      { to: "/reconciliation", icon: "⚖", label: "Rozliczenie dokumentów" },
       { to: "/validation", icon: "⚠", label: "Walidacje" },
       { to: "/reports", icon: "▧", label: "Raporty" },
       { to: "/sync", icon: "⟳", label: "Synchronizacja" },

@@ -13,10 +13,12 @@ import { InvoicesPage } from "./modules/invoices/InvoicesPage";
 import { MappingsPage } from "./modules/products/MappingsPage";
 import { ProductDetailPage } from "./modules/products/ProductDetailPage";
 import { ProductsPage } from "./modules/products/ProductsPage";
+import { ReconciliationPage } from "./modules/reconciliation/ReconciliationPage";
 import { ReportsPage } from "./modules/reports/ReportsPage";
 import { SettingsPage } from "./modules/settings/SettingsPage";
 import { StockBalancesPage } from "./modules/stock/StockBalancesPage";
 import { StockLedgerPage } from "./modules/stock/StockLedgerPage";
+import { WarehouseDocumentsPage } from "./modules/stock/WarehouseDocumentsPage";
 import { WarehousesPage } from "./modules/stock/WarehousesPage";
 import { SyncPage } from "./modules/sync/SyncPage";
 import { UsersPage } from "./modules/users/UsersPage";
@@ -58,6 +60,8 @@ export default function App() {
               <Route path="/warehouses" element={<WarehousesPage />} />
               <Route path="/stock-balances" element={<StockBalancesPage />} />
               <Route path="/stock-ledger" element={<StockLedgerPage />} />
+              <Route path="/warehouse-documents" element={<WarehouseDocumentsPage />} />
+              <Route path="/reconciliation" element={<ReconciliationPage />} />
               <Route path="/validation" element={<ValidationPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/sync" element={<SyncPage />} />

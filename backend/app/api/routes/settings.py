@@ -13,7 +13,11 @@ from app.schemas.common import MessageResponse
 from app.schemas.domain import AppSettingOut, ColumnPreferenceIn, SettingsUpdate
 from app.security.auth import client_ip, get_current_user, require_admin
 from app.services.integration_config import IntegrationConfigService
-from app.services.reconciliation_service import SETTING_INCLUDE_OUTBOUND_DOCUMENTS
+from app.services.reconciliation_service import (
+    DEFAULT_KEEP_RUNS,
+    SETTING_INCLUDE_OUTBOUND_DOCUMENTS,
+    SETTING_KEEP_RUNS,
+)
 from app.services.skyshop_service import (
     SETTING_AUTO_STOCK_PUSH,
     SETTING_DRY_RUN,
@@ -78,6 +82,11 @@ KNOWN_SETTINGS: dict[str, tuple[object, str]] = {
         False,
         "Czy w rozliczeniu odejmować dokumenty WZ/RW/MM (włącz tylko gdy magazyn "
         "rozchodowywany jest dokumentami, a nie fakturami — inaczej podwójne liczenie)",
+    ),
+    SETTING_KEEP_RUNS: (
+        DEFAULT_KEEP_RUNS,
+        "Liczba przechowywanych przeliczeń rozliczenia (starsze są usuwane wraz "
+        "z wierszami, żeby historia trendu nie rosła bez ograniczeń)",
     ),
     SETTING_SYNC_ENABLED: (
         False,

@@ -319,6 +319,14 @@ export interface AppSettingsResponse {
     domain: string | null;
     base_url: string | null;
     token_configured: boolean;
+    source: string;
+    label: string | null;
+  };
+  skyshop: {
+    base_url: string | null;
+    key_configured: boolean;
+    source: string;
+    label: string | null;
   };
   settings: {
     key: string;
@@ -326,4 +334,234 @@ export interface AppSettingsResponse {
     description: string | null;
     is_default?: boolean;
   }[];
+}
+
+// ------------------------- integration accounts ------------------------- //
+
+export interface IntegrationAccount {
+  id: number;
+  provider: string;
+  label: string;
+  config: Record<string, unknown>;
+  secret_configured: boolean;
+  secret_hint: string | null;
+  is_active: boolean;
+  verified_at: string | null;
+  verified_status: string;
+  verified_error: string | null;
+  created_at: string;
+  updated_at: string | null;
+  is_effective: boolean;
+}
+
+export interface EffectiveIntegration {
+  provider: string;
+  source: string;
+  is_configured: boolean;
+  label: string | null;
+  account_id: number | null;
+  target: string | null;
+  details: Record<string, unknown>;
+}
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  message: string;
+  detail: Record<string, unknown> | null;
+}
+
+// ---------------------------- reconciliation ---------------------------- //
+
+export interface ReconciliationRun {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  duration_seconds: number | null;
+  trigger: string;
+  sync_run_id: number | null;
+  line_count: number;
+  discrepancy_count: number;
+  tolerance: string | null;
+  stats: Record<string, unknown> | null;
+}
+
+export interface ReconciliationLine {
+  id: number;
+  run_id: number;
+  product_id: number;
+  warehouse_id: number | null;
+  fakturownia_stock: string | null;
+  inbound_pz: string;
+  inbound_pw: string;
+  outbound_documents: string;
+  sold_invoices: string;
+  corrections: string;
+  opening_balance: string | null;
+  local_ledger_stock: string | null;
+  computed_stock: string;
+  difference: string | null;
+  status: string;
+  computed_at: string;
+  product_name: string | null;
+  product_code: string | null;
+  product_unit: string | null;
+  warehouse_name: string | null;
+}
+
+// -------------------------- warehouse documents ------------------------- //
+
+export interface WarehouseDocumentPosition {
+  id: number;
+  document_id: number;
+  document_kind: string | null;
+  fakturownia_id: number | null;
+  product_fakturownia_id: number | null;
+  mapped_product_id: number | null;
+  mapping_status: string | null;
+  mapping_match_type: string | null;
+  name: string | null;
+  code: string | null;
+  quantity: string | null;
+  quantity_unit: string | null;
+  purchase_price_net: string | null;
+  issue_date: string | null;
+  warehouse_fakturownia_id: number | null;
+  product_name: string | null;
+  document_number: string | null;
+}
+
+export interface WarehouseDocument {
+  id: number;
+  fakturownia_id: number;
+  kind: string | null;
+  number: string | null;
+  warehouse_fakturownia_id: number | null;
+  issue_date: string | null;
+  invoice_fakturownia_id: number | null;
+  description: string | null;
+  is_deleted_upstream: boolean;
+  last_synced_at: string | null;
+  warehouse_name: string | null;
+  position_count: number;
+  total_quantity: string | null;
+  unmapped_position_count: number;
+  positions?: WarehouseDocumentPosition[];
+  raw?: Record<string, unknown> | null;
+}
+
+export interface WarehouseDocumentSummary {
+  by_kind: { kind: string; documents: number }[];
+  inbound_position_count: number;
+  inbound_unmapped_count: number;
+  inbound_quantity: string;
+}
+
+// -------------------------------- SkyShop ------------------------------- //
+
+export interface SkyShopSummary {
+  write_enabled: boolean;
+  dry_run: boolean;
+  stock_source: string;
+  link_status_counts: Record<string, number>;
+  job_status_counts: Record<string, number>;
+  mirror_product_count: number;
+  mirror_synced_at: string | null;
+  last_push_at: string | null;
+  pending_jobs: number;
+  failed_jobs: number;
+}
+
+export interface SkyShopLink {
+  id: number;
+  product_id: number;
+  skyshop_id: string | null;
+  status: string;
+  match_type: string | null;
+  candidate_skyshop_ids: string[] | null;
+  last_pushed_stock: string | null;
+  last_pushed_content_hash: string | null;
+  last_pushed_at: string | null;
+  last_error: string | null;
+  notes: string | null;
+  product_name: string | null;
+  product_code: string | null;
+  product_sku: string | null;
+  product_ean: string | null;
+  local_stock: string | null;
+  shop_stock: string | null;
+  shop_name: string | null;
+  stock_out_of_sync: boolean;
+  content_out_of_sync: boolean;
+}
+
+export interface SkyShopProduct {
+  id: number;
+  skyshop_id: string;
+  sku: string | null;
+  ean: string | null;
+  name: string | null;
+  price_gross: string | null;
+  quantity: string | null;
+  category_skyshop_id: string | null;
+  is_active: boolean | null;
+  is_deleted_upstream: boolean;
+  last_synced_at: string | null;
+}
+
+export interface SkyShopCategory {
+  id: number;
+  skyshop_id: string;
+  name: string | null;
+  parent_skyshop_id: string | null;
+  path: string | null;
+  mapped_local_category: string | null;
+}
+
+export interface SkyShopCategoryMapping {
+  id: number;
+  local_category: string;
+  skyshop_category_id: string;
+  skyshop_category_name: string | null;
+  updated_at: string | null;
+}
+
+export interface ProductContent {
+  product_id: number;
+  description_html: string | null;
+  short_description: string | null;
+  images: { url?: string; alt?: string; position?: number }[];
+  attributes: Record<string, string>;
+  price_gross: string | null;
+  vat_rate: string | null;
+  local_category: string | null;
+  weight: string | null;
+  is_publishable: boolean;
+  updated_at: string | null;
+  content_hash: string | null;
+  publication_problems: string[];
+}
+
+export interface SyncJob {
+  id: number;
+  provider: string;
+  job_type: string;
+  dedupe_key: string | null;
+  payload: Record<string, unknown>;
+  status: string;
+  priority: number;
+  attempts: number;
+  max_attempts: number;
+  next_attempt_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  result: Record<string, unknown> | null;
+  last_error: string | null;
+  product_id: number | null;
+  product_name: string | null;
+  created_at: string;
+}
+
+export interface MessageResponse {
+  message: string;
+  detail?: Record<string, unknown> | null;
 }
